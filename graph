@@ -1,0 +1,16 @@
+digraph Tree {
+    Node_0 [label="and"]
+    Node_1 [label="i"]
+    Node_2 [label="love"]
+    Node_3 [label="that"]
+    Node_4 [label="this"]
+    Node_0 -> Node_2 [label="1"]
+    Node_0 -> Node_3 [label="1"]
+    Node_0 -> Node_4 [label="1"]
+    Node_1 -> Node_2 [label="1"]
+    Node_2 -> Node_3 [label="1"]
+    Node_2 -> Node_4 [label="1"]
+    Node_3 -> Node_0 [label="1"]
+    Node_4 -> Node_0 [label="2"]
+
+}

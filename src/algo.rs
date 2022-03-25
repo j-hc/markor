@@ -1,4 +1,4 @@
-use crate::{hide_cursor, pos_by_word, unhide_cursor, State, TaggedNextState};
+use crate::{hide_cursor, pos_by_word, unhide_cursor, State};
 
 pub fn state_chainer(corpus: &str, _k_word: usize) -> Vec<State> {
     let mut corpus_split = corpus.split_whitespace().collect::<Vec<&str>>();
@@ -47,12 +47,12 @@ pub fn state_chainer_sort_insert(corpus: &str, _k_word: usize) -> Vec<State> {
     let corpus_len = corpus_split.len();
 
     let mut distinct_words = corpus_split.clone();
-    distinct_words.sort();
+    distinct_words.sort_unstable();
     distinct_words.dedup();
     let distinct_words_len = distinct_words.len();
 
     let mut states = distinct_words
-        .iter_mut()
+        .iter()
         .map(|w| State {
             word: w,
             next_states: Vec::with_capacity(distinct_words_len),
@@ -73,9 +73,7 @@ pub fn state_chainer_sort_insert(corpus: &str, _k_word: usize) -> Vec<State> {
             .binary_search_by(|s| s.0.cmp(&dst_state))
         {
             Ok(i) => unsafe { src_state.next_states.get_unchecked_mut(i) }.1 += 1,
-            Err(i) => {
-                src_state.next_states.insert(i, (dst_state, 1));
-            }
+            Err(i) => src_state.next_states.insert(i, (dst_state, 1)),
         }
         print!(
             "Processing: {}/{}\r\nCompleted: {}%\x1B[1A\r",

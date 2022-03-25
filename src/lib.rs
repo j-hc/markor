@@ -1,8 +1,8 @@
 use rand::prelude::SliceRandom;
-// use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
 
@@ -50,6 +50,7 @@ pub fn generate_text(states: &[State], length: usize, seed: Option<&str>) -> Str
         sentence.push_str(cur_state.word);
 
         cur_state = if cur_state.next_states.is_empty() {
+            sentence.push('.');
             states.choose(&mut rng).unwrap()
         } else {
             let next_state_i = cur_state
@@ -64,7 +65,13 @@ pub fn generate_text(states: &[State], length: usize, seed: Option<&str>) -> Str
 }
 
 pub fn corpus_cleanup(corpus: &mut String) {
-    *corpus = corpus.replace('\n', " ").replace('\t', " ").to_lowercase();
+    *corpus = corpus
+        .replace('\n', " ")
+        .replace('\t', " ")
+        .replace('”', "\"")
+        .replace('‟', "\"")
+        .replace('\'', "")
+        .to_lowercase();
     for p in ['.', '-', ',', '!', '?', '(', '—', ')', '"'] {
         *corpus = corpus.replace(p, &format!(" {} ", p))
     }
@@ -72,8 +79,8 @@ pub fn corpus_cleanup(corpus: &mut String) {
     // *corpus = pre.replace_all(s, "").to_string();
 }
 
-pub fn dump_graph(states: &[State]) -> io::Result<()> {
-    let mut f = File::create("graph").unwrap();
+pub fn dump_graph(states: &[State], path: impl AsRef<Path>) -> io::Result<()> {
+    let mut f = File::create(&path).unwrap();
 
     f.write_all(b"digraph Tree {\n")?;
     for (i, s) in states.iter().enumerate() {
@@ -87,7 +94,7 @@ pub fn dump_graph(states: &[State]) -> io::Result<()> {
     }
     f.write_all(b"\n}")?;
     Command::new("dot")
-        .args(["-Tsvg", "graph", "-O"])
+        .args(["-Tsvg", path.as_ref().to_str().unwrap(), "-O"])
         .spawn()?
         .wait()?;
     Ok(())
@@ -97,7 +104,7 @@ pub fn load_model(buf: &[u8]) -> bincode::Result<Vec<State>> {
     bincode::deserialize(buf)
 }
 
-pub fn train_model<T>(out: &mut impl Write, corpus: &str, trainer: T) -> bincode::Result<()>
+pub fn train_model<T>(corpus: &str, trainer: T) -> Vec<State>
 where
     T: Fn(&str, usize) -> Vec<State>,
 {
@@ -108,5 +115,9 @@ where
         "Training took {:.2} seconds\nDumping the model..",
         i.elapsed().as_secs_f32()
     );
-    bincode::serialize_into(out, &states)
+    states
+}
+
+pub fn dump_model(model: &[State], sink: &mut impl Write) -> bincode::Result<()> {
+    bincode::serialize_into(sink, model)
 }
