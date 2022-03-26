@@ -1,3 +1,7 @@
+#![feature(array_windows, array_chunks, generic_const_exprs, slice_as_chunks)]
+
+pub mod algo;
+
 use rand::prelude::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -6,15 +10,33 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
 
+use algo::state_chainer_ngrams;
+
 type Freq = u32;
 type StateIndex = usize;
 type TaggedNextState = (StateIndex, Freq);
 
-pub mod algo;
+type Model<'a, const N: usize> = Vec<State<'a, N>>;
+type BModel<'a, const N: usize> = &'a [State<'a, N>];
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct State<'a> {
-    word: &'a str,
+// pub fn ngrams<'a, const N: usize, T>(tokens: &[T]) -> impl Iterator<Item = &[T; N]> {
+//     tokens.array_windows::<N>().into_iter()
+// }
+
+// pub fn mngrams<'a, const M: usize, const N: usize, T>(
+//     tokens: &[T],
+// ) -> impl Iterator<Item = (&[T], &[T])>
+// where
+//     [T; M + N]: Sized,
+// {
+//     tokens
+//         .array_windows::<{ M + N }>()
+//         .map(|e| (&e[..M], &e[M..M + N]))
+// }
+
+#[derive(Debug)]
+pub struct State<'a, const N: usize> {
+    word: &'a [&'a str; N],
     next_states: Vec<TaggedNextState>,
 }
 
@@ -26,39 +48,52 @@ fn unhide_cursor() {
     print!("\x1B[?25h\r\n\n");
 }
 
-fn pos_by_word(states: &[State], word: &str) -> Option<StateIndex> {
-    states
-        .iter()
-        .position(|s| s.word.eq_ignore_ascii_case(word))
+fn find_by_seq<'a, const N: usize>(
+    states: &'a [State<N>],
+    seq: &[&str],
+) -> Option<&'a State<'a, N>> {
+    states.iter().find(|s| {
+        s.word
+            .iter()
+            .zip(seq.iter())
+            .all(|(s1, s2)| s1.eq_ignore_ascii_case(s2))
+    })
 }
 
-fn find_by_word<'a>(states: &'a [State], word: &str) -> Option<&'a State<'a>> {
-    states.iter().find(|s| s.word.eq_ignore_ascii_case(word))
-}
+pub fn generate_text<'a, const N: usize>(
+    model: BModel<'a, N>,
+    length: usize,
+    seed: Option<&[&str]>,
+) -> String {
+    assert!(!model.is_empty(), "model is empty");
+    assert_eq!(
+        model.get(0).unwrap().word.len(),
+        seed.map(|s| s.len())
+            .unwrap_or_else(|| model.get(0).unwrap().word.len()),
+        "seed must be the same length as the ngrams"
+    );
 
-pub fn generate_text(states: &[State], length: usize, seed: Option<&str>) -> String {
-    assert!(!states.is_empty());
     let mut rng = rand::thread_rng();
 
-    let seed = seed.unwrap_or(states.choose(&mut rng).unwrap().word);
-    let inital_state = find_by_word(states, seed).expect("Could not find a state with the seed");
+    let seed = seed.unwrap_or(model.choose(&mut rng).unwrap().word);
+    let inital_state = find_by_seq(model, seed).expect("Could not find a state with the seed");
 
     let mut sentence = String::new();
     let mut cur_state = inital_state;
     for _ in 0..length {
         sentence.push(' ');
-        sentence.push_str(cur_state.word);
+        sentence.push_str(&cur_state.word.join(" "));
 
         cur_state = if cur_state.next_states.is_empty() {
             sentence.push('.');
-            states.choose(&mut rng).unwrap()
+            model.choose(&mut rng).unwrap()
         } else {
             let next_state_i = cur_state
                 .next_states
                 .choose_weighted(&mut rng, |s| s.1)
                 .unwrap()
                 .0;
-            unsafe { states.get_unchecked(next_state_i) }
+            unsafe { model.get_unchecked(next_state_i) }
         };
     }
     sentence[1..].to_string()
@@ -75,16 +110,14 @@ pub fn corpus_cleanup(corpus: &mut String) {
     for p in ['.', '-', ',', '!', '?', '(', '—', ')', '"'] {
         *corpus = corpus.replace(p, &format!(" {} ", p))
     }
-    // let pre = Regex::new("[^a-zA-ZçÇğĞıİöÖşŞüÜ.?! ]").unwrap();
-    // *corpus = pre.replace_all(s, "").to_string();
 }
 
-pub fn dump_graph(states: &[State], path: impl AsRef<Path>) -> io::Result<()> {
+pub fn dump_graph<const N: usize>(states: BModel<N>, path: impl AsRef<Path>) -> io::Result<()> {
     let mut f = File::create(&path).unwrap();
 
     f.write_all(b"digraph Tree {\n")?;
     for (i, s) in states.iter().enumerate() {
-        writeln!(f, "    Node_{} [label=\"{}\"]", i, s.word)?;
+        writeln!(f, "    Node_{} [label=\"{}\"]", i, s.word.join(" "))?;
     }
 
     for (i, s) in states.iter().enumerate() {
@@ -100,16 +133,16 @@ pub fn dump_graph(states: &[State], path: impl AsRef<Path>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn load_model(buf: &[u8]) -> bincode::Result<Vec<State>> {
-    bincode::deserialize(buf)
+pub fn get_tokens(corpus: &str) -> Vec<&str> {
+    corpus.split_whitespace().collect::<Vec<&str>>()
 }
 
-pub fn train_model<T>(corpus: &str, trainer: T) -> Vec<State>
+pub fn train_model_ngrams<'a, const N: usize>(tokens: &'a [&'a str]) -> Model<'a, N>
 where
-    T: Fn(&str, usize) -> Vec<State>,
+    [(); N * 2]: Sized,
 {
     let i = Instant::now();
-    let states = trainer(corpus, 0);
+    let states = state_chainer_ngrams::<N>(tokens);
     println!("Trained on {} unique states", states.len());
     println!(
         "Training took {:.2} seconds\nDumping the model..",
@@ -118,6 +151,10 @@ where
     states
 }
 
-pub fn dump_model(model: &[State], sink: &mut impl Write) -> bincode::Result<()> {
-    bincode::serialize_into(sink, model)
-}
+// pub fn load_model(b_model: &[u8]) -> bincode::Result<Model> {
+//     bincode::deserialize(b_model)
+// }
+
+// pub fn dump_model(model: BModel, sink: &mut impl Write) -> bincode::Result<()> {
+//     bincode::serialize_into(sink, model)
+// }
