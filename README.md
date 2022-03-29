@@ -5,22 +5,14 @@
 ![](./graph.svg)
 
 
-## Examle Using the Turkish Bible as the data:
+## Example Using the Turkish Bible as the data:
 ```
-$ ./markov-chainz
-$ Processing: 548940/548940
-Completed: 100%
-Trained on 53875 unique states
-Training took 7.06 seconds
-Dumping the model..
-
-Generated:
-ben kefas, yayla altüst eder. öyleleri var üzerimde olduğu için gönülden verdiğiniz
-sunuları sunacaksınız . titusa baba sözü anımsa . i̇çinde oturmak için yas tutuyor.
-nedir? ey tanrı korkusuyla sarsıldı. davutla adamları getirttiler. yedi gün çukura
-yaklaşınca i̇sa mesihin gününde en sonuncu, canın için kenherede saçlarını yoldum,
-seni yanıtlayayım; bilmediğin gibi yaptım. atalarının suçları silen benim değil,
-zeytinliklerinizi alıp yetmiş şekel gümüş taban olacak. tanrının, egemenlik sürecek
-sizin de karanlıkta vurmak için, uyan, öne atılır. musa rabbin meshettiği kişiyi 
-sağ kalan timnat - ezer
+$ ./markor
+örtüyor, öbür hayvanları da kulluk etsinler diye musayı, seçtiği harunu gönderdi aralarına. onlar kardeşinizdir.
+mısırlılardan da iğrenmeyeceksiniz. çünkü ar kentini lut soyuna verdim. ey uzaktakiler, ne yıkmak, ne oldu bilmiyoruz!"
+balama öfkelenen balak ellerini birbirine vurarak, düşmanlarıma lanet okuyasın diye seni onlara saldırtacağıma ilişkin
+yıllarca peygamberlik ettiler. eli artık çok yaşlanmıştı. oğullarının i̇sraillilere bütün yaptıklarını, saymakla bitmez.
+havaya uçuşan kıvılcımlar gibi sıkıntı çekmek için yapacağım. onların peşine düşeceğim. onları ağır biçimde cezalandırarak
+halkım i̇sraili kulum davut için doğru bir adamdır. tanrıdan geldiğine bunun için mesih aracılığıyla gelen doğruluk meyvesiyle
+dolarak mesihin gününde saf ve kusursuz olarak koru. sonunda rab onu bağışlayacak
 ```
